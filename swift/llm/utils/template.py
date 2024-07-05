@@ -54,6 +54,7 @@ class TemplateType:
     internlm_xcomposer2 = 'internlm-xcomposer2'
     internvl = 'internvl'
     internvl_phi3 = 'internvl-phi3'
+    internvl2 = 'internvl2'
     florence = 'florence'
     yi = 'yi'
     yi1_5 = 'yi1_5'
@@ -1311,6 +1312,89 @@ class InternvlPhi3Template(InternvlTemplate):
         Template.__init__(self, ['<s>'], ['<|user|>\n{{QUERY}}<|end|>\n<|assistant|>\n'], ['<|end|>\n'], ['<|end|>'],
                           self.system, ['<s><|system|>\n{{SYSTEM}}<|end|>\n'])
 
+class Internvl2Template(Template):
+    system = 'You are an AI assistant whose name is InternLM (书生·浦语).'
+    num_image_token = 256
+
+    def __init__(self):
+        super().__init__(['<s>'], ['<|im_start|>user\n{{QUERY}}<|im_end|><|im_start|>assistant\n'], ['<|im_end|>'],
+                         ['<|im_end|>'], self.system, ['<s><|im_start|>system\n{{SYSTEM}}<|im_end|>'])
+
+    def replace_tag(self, media_type, index, example) -> List[Context]:
+        assert media_type == 'image'
+        return [[-100]]
+
+    def encode(self, example: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        inputs, _ = super().encode(example)
+        if len(inputs) == 0:
+            return inputs, {}
+        input_ids = inputs['input_ids']
+        idx_list = _findall(input_ids, -100)
+        labels = inputs.get('labels')
+        images_path = example.get('images') or []
+        pre_images_path = example.get('pre_images') or []
+        search_images_path = example.get('search_images') or []
+        if search_images_path and pre_images_path :
+            from .vision_utils import load_image, load_image_new, load_image_tbh
+
+            pixel_values = []
+            num_patches_list = []
+            # if isinstance(images_path, str):
+            #     images_path = [images_path]
+            # for image_path in images_path:
+            #     pixel_values.append(load_image(image_path))
+            for pre_image_path in pre_images_path:
+                pixel_value = load_image_tbh(pre_image_path,max_num=1)
+                pixel_values.append(pixel_value)
+                num_patches_list.append(pixel_value.size(0))
+            for search_image_path in search_images_path:
+                pixel_value = load_image_tbh(search_image_path,max_num=1)
+                pixel_values.append(pixel_value)
+                num_patches_list.append(pixel_value.size(0))
+            # pixel_values.append(load_image_new(imgs_path=pre_images_path, max_num=1))
+            # pixel_values.append(load_image_new(imgs_path=search_images_path, max_num=1))
+            pixel_values = torch.cat(pixel_values, dim=0)
+            image_bs = pixel_values.shape[0]
+
+            idx, idx2 = idx_list[0], idx_list[-1]  # remove [-100, -100]
+            # img_tokens: List[int] = self.tokenizer.encode(
+            #     '<img>' + '<IMG_CONTEXT>' * self.num_image_token * image_bs + '</img>\n', add_special_tokens=False)
+            img_tokens = []
+            for num_patches in num_patches_list:
+                img_tokens += self.tokenizer.encode(
+                '<img>' + '<IMG_CONTEXT>' * self.num_image_token * num_patches + '</img>\n', add_special_tokens=False)
+            input_ids = input_ids[:idx] + img_tokens + input_ids[idx2 + 1:]
+            if labels is not None:
+                labels = labels[:idx] + [-100] * len(img_tokens) + labels[idx2 + 1:]
+            inputs['input_ids'] = input_ids
+            inputs['labels'] = labels
+
+            inputs['pixel_values'] = pixel_values.to(self.model.dtype)
+            inputs['image_flags'] = torch.ones(image_bs)
+
+        inputs.pop('loss_scale', None)
+        return inputs, {}
+
+    def data_collator(self, batch: List[Dict[str, Any]], padding_to: Optional[int] = None) -> Dict[str, Any]:
+        res = super().data_collator(batch, padding_to)
+        assert all('pixel_values' in b for b in batch), 'Temporarily, Interval only supports data with images'
+        image_flags = [b['image_flags'] for b in batch if 'image_flags' in b]
+        if image_flags:
+            res['image_flags'] = torch.concat(image_flags)
+        return res
+
+    @staticmethod
+    def get_generate_ids(generate_ids: Tensor, input_token_len: int) -> List[int]:
+        return generate_ids[0].tolist()
+
+register_template(
+    TemplateType.internvl2,
+    Internvl2Template(),
+    use_model=True,
+    lazy_tokenize=True,
+    infer_media_type='dialogue',
+    dataloader_num_workers=0,
+    dataloader_pin_memory=False)
 
 register_template(
     TemplateType.internvl,

@@ -875,10 +875,11 @@ def inference_tbh(model: PreTrainedModel,
     rele_info = []
     
     while torch.all(torch.tensor(scores_cpu[level_idx[1][0], level_idx[0][0],:][label_ids]).float() == float('-inf')):
-        level_idx[1][0] += 1
+        level_idx[1][0] = 1
+        break
         # print(f"level_idx now: {level_idx}")
     ############ DEBUG ONLY ###########
-    # # 获取生成的文本
+    # 获取生成的文本
     # generated_text = tokenizer.decode(res.sequences[0], skip_special_tokens=False)
     # print("Generated text:", generated_text)
 
@@ -946,10 +947,10 @@ def inference_tbh(model: PreTrainedModel,
         print(response)
     response = template.generate_ids_to_response(generate_ids, tokenizer_kwargs=tokenizer_kwargs)
     response = template.post_process_generate_response(response=response, example=example)
-    if not is_observation:
-        history.append([query, response])
-    else:
-        history[-1][-1] = history[-1][-1] + response
+    # if not is_observation:
+    #     history.append([query, response])
+    # else:
+    #     history[-1][-1] = history[-1][-1] + response
     return response, more_info, history
 
 def limit_history_length(template: Template, query: str, history: Optional[History],

@@ -101,6 +101,39 @@ def load_image(img_path, input_size=448, max_num=6):
     pixel_values = torch.stack(pixel_values)
     return pixel_values
 
+def load_image_tbh(img_path, input_size=448, max_num=1):
+    try:
+        if isinstance(img_path, str):
+            img_path = img_path.strip()
+            if img_path.startswith('http'):
+                content = requests.get(img_path).content
+                image = Image.open(BytesIO(content))
+            else:
+                filename = os.path.dirname(img_path)
+                img_filename = os.path.basename(img_path)
+                if filename.endswith(".zip"):
+                    if not os.path.exists(filename):
+                        raise FileNotFoundError(f"Zip file {filename} does not exist.")
+                    with zipfile.ZipFile(filename, 'r') as zip_file:                        
+                        img_bytes = zip_file.read(img_filename)
+                        # print(Image.open(BytesIO(img_bytes)).size)
+                        image = Image.open(BytesIO(img_bytes))
+                else:
+                    image = Image.open(img_path)
+        else:
+            image = img_path
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+    except (zipfile.BadZipFile, FileNotFoundError) as e:
+        print(f"Error opening zip file {filename}: {e}")
+        # image = torch.zeros(3, 448, 448)
+        image = Image.new('RGB', (448, 448))
+    transform = build_transform(input_size=input_size)
+    images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
+    pixel_values = [transform(image) for image in images]
+    pixel_values = torch.stack(pixel_values)
+    return pixel_values
+
 def load_image_new(imgs_path, input_size=448, max_num=1):
     def _concat_images(images: List['PIL.Image.Image'], input_size=448) -> 'PIL.Image.Image':
         from PIL import Image
