@@ -8,6 +8,9 @@ import torch
 import torchvision.transforms as T
 from PIL import Image, UnidentifiedImageError
 from torchvision.transforms.functional import InterpolationMode
+import zipfile
+import os
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 
 IMAGENET_MEAN = (0.485, 0.456, 0.406)
 IMAGENET_STD = (0.229, 0.224, 0.225)
@@ -94,6 +97,90 @@ def load_image(img_path, input_size=448, max_num=6):
         image = image.convert('RGB')
     transform = build_transform(input_size=input_size)
     images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
+    pixel_values = [transform(image) for image in images]
+    pixel_values = torch.stack(pixel_values)
+    return pixel_values
+
+def load_image_new(imgs_path, input_size=448, max_num=1):
+    def _concat_images(images: List['PIL.Image.Image'], input_size=448) -> 'PIL.Image.Image':
+        from PIL import Image
+        images = [img.resize((input_size, input_size)) for img in images]
+        num_images = len(images)
+        if num_images == 1:
+            grid_size = (1, 1)
+        elif num_images == 2:
+            grid_size = (1, 2)
+        elif num_images == 3:
+            grid_size = (1, 3)
+        elif num_images == 4:
+            grid_size = (2, 2)
+        elif num_images == 5:
+            grid_size = (2, 3)
+        elif num_images == 6:
+            grid_size = (2, 3)
+        elif num_images == 7:
+            grid_size = (2, 4)
+        elif num_images == 8:
+            grid_size = (2, 4)
+        else:
+            raise ValueError("This function only supports 1 to 8 images.")
+        
+        # Calculate the size of the grid
+        max_width = max(img.width for img in images)
+        max_height = max(img.height for img in images)
+        
+        total_width = max_width * grid_size[1]
+        total_height = max_height * grid_size[0]
+        
+        new_image = Image.new('RGB', (total_width, total_height))
+        
+        for idx, img in enumerate(images):
+            row = idx // grid_size[1]
+            col = idx % grid_size[1]
+            x_offset = col * max_width
+            y_offset = row * max_height
+            new_image.paste(img, (x_offset, y_offset))
+        
+        return new_image
+    # # 拼接多张图片
+    # pre_image = _concat_images(pre_images)
+    # search_image = _concat_images(search_images)
+    images = []
+    for img_path in imgs_path:
+        try:
+            if isinstance(img_path, str):
+                img_path = img_path.strip()
+                if img_path.startswith('http'):
+                    content = requests.get(img_path).content
+                    image = Image.open(BytesIO(content))
+                else:
+                    filename = os.path.dirname(img_path)
+                    img_filename = os.path.basename(img_path)
+                    if filename.endswith(".zip"):
+                        if not os.path.exists(filename):
+                            raise FileNotFoundError(f"Zip file {filename} does not exist.")
+                        with zipfile.ZipFile(filename, 'r') as zip_file:                        
+                            img_bytes = zip_file.read(img_filename)
+                            # print(Image.open(BytesIO(img_bytes)).size)
+                            image = Image.open(BytesIO(img_bytes))
+                    else:
+                        image = Image.open(img_path)
+            else:
+                image = img_path
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+            images.append(image)
+        except (zipfile.BadZipFile, FileNotFoundError) as e:
+            print(f"Error opening zip file {filename}: {e}")
+            # image = torch.zeros(3, 448, 448)
+            image = Image.new('RGB', (448, 448))
+            # image = torch.zeros(3, 1080, 1920)
+            images.append(image) 
+    # resized_images = [img.resize((input_size, input_size)) for img in images]
+    image = _concat_images(images)
+    transform = build_transform(input_size=input_size)
+    images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
+    # images = [image.resize((input_size, input_size))]
     pixel_values = [transform(image) for image in images]
     pixel_values = torch.stack(pixel_values)
     return pixel_values

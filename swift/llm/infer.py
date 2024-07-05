@@ -16,7 +16,7 @@ from swift.tuners import Swift
 from swift.utils import (append_to_jsonl, get_logger, get_main, get_model_info, read_multi_line, seed_everything,
                          show_layers)
 from .utils import (DeployArguments, InferArguments, Template, get_additional_saved_files, get_dataset,
-                    get_model_tokenizer, get_template, inference, inference_stream, is_adapter, is_quant_model,
+                    get_model_tokenizer, get_template, inference, inference_tbh, inference_stream, is_adapter, is_quant_model,
                     sample_dataset, set_generation_config)
 
 logger = get_logger()
@@ -524,7 +524,9 @@ def llm_infer(args: InferArguments) -> Dict[str, List[Dict[str, Any]]]:
                             print_idx = len(response)
                     print()
                 else:
-                    response, _ = inference(
+                    # response, _ = inference(
+                    #     model, template, stream=args.stream and args.verbose, verbose=args.verbose, **kwargs)
+                    response, more_info, _ = inference_tbh(
                         model, template, stream=args.stream and args.verbose, verbose=args.verbose, **kwargs)
                 label = data.pop('response', None)
                 obj = {
@@ -534,6 +536,12 @@ def llm_infer(args: InferArguments) -> Dict[str, List[Dict[str, Any]]]:
                     'label': label,
                     'history': kwargs['history'],
                 }
+                obj.update(more_info)
+                obj.update({
+                    'searchid': data['searchid'],
+                    'pre_feedid': data['pre_feedid'],
+                    'is_person': data['is_person']
+                })
                 if images is not None:
                     obj['images'] = images
                 if jsonl_path is not None:

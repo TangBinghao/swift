@@ -556,6 +556,8 @@ def _prepare_inputs(model: PreTrainedModel,
                     history: History,
                     system: Optional[str] = None,
                     images: Optional[List[str]] = None,
+                    pre_images: Optional[List[str]] = None,
+                    search_images: Optional[List[str]] = None,
                     *,
                     generation_config: Optional[GenerationConfig] = None,
                     stop_words: Optional[StopWords] = None,
@@ -569,6 +571,8 @@ def _prepare_inputs(model: PreTrainedModel,
         'history': history,
         'system': system,
         'images': images or [],  # for vl. str.
+        'pre_images': pre_images or [], 
+        'search_images': search_images or [], 
         'tools': kwargs.pop('tools', None),
         'objects': kwargs.pop('objects', None),
     }
@@ -794,6 +798,159 @@ def inference(model: PreTrainedModel,
         history[-1][-1] = history[-1][-1] + response
     return response, history
 
+@torch.inference_mode()
+def inference_tbh(model: PreTrainedModel,
+              template: Template,
+              query: str,
+              history: Optional[History] = None,
+              system: Optional[str] = None,
+              images: Optional[List[str]] = None,
+              pre_images: Optional[List[str]] = None,
+              search_images: Optional[List[str]] = None,
+              *,
+              generation_config: Optional[GenerationConfig] = None,
+              stop_words: Optional[StopWords] = None,
+              stream: bool = False,
+              verbose: bool = False,
+              prompt_prefix: str = '[PROMPT]',
+              output_prefix: str = '[OUTPUT]',
+              generation_info: Optional[Dict[str, int]] = None,
+              adapter_names: Optional[List[str]] = None,
+              **kwargs) -> Tuple[str, History]:
+    """
+    generation_config: Priority: generation_config > model.generation_config.
+    """
+    if history is None:
+        history = []
+    else:
+        history = deepcopy(history)
+    inputs, tokenizer_kwargs, token_len, example = _prepare_inputs(
+        model,
+        template,
+        query,
+        history,
+        system,
+        images,
+        pre_images,
+        search_images,
+        generation_config=generation_config,
+        stop_words=stop_words,
+        adapter_names=adapter_names,
+        **kwargs)
+    if len(inputs) == 0:
+        return '', history
+    if generation_info is None:
+        generation_info = {}
+    generation_info['num_prompt_tokens'] = token_len
+
+    # agent support
+    is_observation = history[-1][-1].endswith('Observation:') if history and history[-1][-1] else False
+    if is_observation:
+        history[-1][-1] = history[-1][-1] + query
+        query = None
+
+    if stream and not verbose:
+        logger.warning('Please set verbose to True to support TextStreamer, or use `inference_stream.`')
+        stream = False
+    streamer = None
+    tokenizer = template.tokenizer
+    if stream:
+        streamer = TextStreamer(tokenizer, skip_prompt=True)
+    if verbose:
+        if 'input_ids' in inputs:
+            input_ids = inputs['input_ids']
+            print(
+                f'{prompt_prefix}{safe_tokenizer_decode(tokenizer, input_ids[0], **tokenizer_kwargs)}{output_prefix}',
+                end='')
+        else:
+            print(f'[QUERY]{query}\n{output_prefix}', end='')
+    ###### BEGIN #####
+    res = model.generate(
+        streamer=streamer, return_dict_in_generate=True, output_scores=True, **inputs)
+    generate_ids = res.sequences
+    scores = res.scores
+    level_idx = (torch.tensor([0]), torch.tensor([0]))
+    scores_cpu = np.array([x.to(torch.float32).detach().cpu().numpy() for x in scores])
+    label_ids = [x[-1] for x in tokenizer(['0', '1']).input_ids]
+    rele_info = []
+    
+    while torch.all(torch.tensor(scores_cpu[level_idx[1][0], level_idx[0][0],:][label_ids]).float() == float('-inf')):
+        level_idx[1][0] += 1
+        # print(f"level_idx now: {level_idx}")
+    ############ DEBUG ONLY ###########
+    # # 获取生成的文本
+    # generated_text = tokenizer.decode(res.sequences[0], skip_special_tokens=False)
+    # print("Generated text:", generated_text)
+
+    # # 获取生成过程中的分数
+    # debug_scores = res.scores
+
+    # # 获取每一步的候选词及其分数
+    # for i, score in enumerate(debug_scores):
+    #     # 获取当前步的分数
+    #     step_scores = score[0]
+        
+    #     # 获取分数最高的前几个候选词
+    #     top_k = 5
+    #     top_k_scores, top_k_indices = torch.topk(step_scores, top_k)
+        
+    #     # 打印当前步的候选词及其分数
+    #     print(f"Step {i + 1}:")
+    #     for j in range(top_k):
+    #         token_id = top_k_indices[j].item()
+    #         token_score = top_k_scores[j].item()
+    #         token = tokenizer.decode([token_id], skip_special_tokens=False)
+    #         print(f"  Token: {token}, Score: {token_score}")
+    ############ DEBUG ONLY ###########
+
+    for idx1, idx2 in zip(level_idx[0], level_idx[1]):
+        logits = scores_cpu[idx2, idx1,:]
+        # print('logits',logits)
+        # torch.save(logits, "logits.pt")
+        rele_logits = torch.tensor(logits[label_ids]).float()
+        # print('rele_logits',rele_logits)
+        # torch.save(rele_logits, "rele_logits.pt")
+        probs = torch.nn.functional.softmax(rele_logits,dim=0).numpy()
+        # print('probs',probs)
+        rele_scores = (probs * np.array([0, 1])).sum(axis=0)
+        # print('rele_scores',rele_scores)
+        # rele_levels = np.argmax(probs) + 1
+        rele_levels = np.argmax(probs)
+        # print('rele_levels',rele_levels)
+        rele_info.append((rele_scores, rele_levels))
+    # torch.save(rele_info, "rele_info.pt")
+    correct = 0
+    for idx in range(len(rele_info)):
+        score, level = rele_info[idx]
+        # sid = sample_dict['searchid']
+        # label = sample_dict['output'][-1]
+        sparse_ctr = score
+        semantic_ctr = score
+        # label = int(label)
+        sparse_ctr = float(sparse_ctr) 
+        semantic_ctr = float(semantic_ctr)
+        # prefeedid_key = sample_dict['pre_docids']
+        # is_person = sample_dict['is_person']
+        predict_label = level
+        try:
+            predict_label = int(predict_label)
+        except:
+            predict_label = -1
+    more_info = {"sparse_ctr": sparse_ctr, "semantic_ctr": semantic_ctr,"predict_label_level":predict_label}
+    ###### END ########
+    # generate_ids = model.generate(streamer=streamer, **inputs)
+    generate_ids = template.get_generate_ids(generate_ids, token_len)
+    generation_info['num_generated_tokens'] = len(generate_ids)
+    if verbose and stream is False:
+        response = tokenizer.decode(generate_ids, **tokenizer_kwargs)
+        print(response)
+    response = template.generate_ids_to_response(generate_ids, tokenizer_kwargs=tokenizer_kwargs)
+    response = template.post_process_generate_response(response=response, example=example)
+    if not is_observation:
+        history.append([query, response])
+    else:
+        history[-1][-1] = history[-1][-1] + response
+    return response, more_info, history
 
 def limit_history_length(template: Template, query: str, history: Optional[History],
                          max_length: Optional[int]) -> Tuple[History, History]:

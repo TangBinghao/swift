@@ -152,7 +152,7 @@ class Template:
     """
 
     special_tokens = ['<image>', '<video_label>', '<audio_label>', '<bbox>', '<ref-object>']
-    special_keys = ['images', 'videos', 'audios', 'objects']
+    special_keys = ['images','pre_images','search_images', 'videos', 'audios', 'objects']
 
     def __init__(self,
                  prefix: Prompt,
@@ -261,7 +261,7 @@ class Template:
     def add_default_tags(self, example: Dict[str, Any]) -> None:
         history: History = deepcopy(example.get('history') or [])
         query: str = example.get('query') or ''
-        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'), ('audios', '<audio_label>')]:
+        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'), ('search_images', '<image>'), ('audios', '<audio_label>')]:
             if example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{query}'):
                 infer_media_type = TEMPLATE_MAPPING[self.template_type].get('infer_media_type')
                 if infer_media_type == 'round':
@@ -328,7 +328,7 @@ class Template:
         template_type: Optional[str] = getattr(self, 'template_type', None)
         tools: Union[List[Any], str] = example.get('tools') or []
         is_multi_modal: bool = any([example.get(key) for key in Template.special_keys])
-
+        # print("is_multi_modal",is_multi_modal)
         if len(history) > 0:
             assert self.support_multi_round, (
                 f'The template does not support multi-round chat, template_type: {template_type}')
@@ -1261,14 +1261,18 @@ class InternvlTemplate(Template):
         idx_list = _findall(input_ids, -100)
         labels = inputs.get('labels')
         images_path = example.get('images') or []
-        if images_path:
-            from .vision_utils import load_image
+        pre_images_path = example.get('pre_images') or []
+        search_images_path = example.get('search_images') or []
+        if search_images_path and pre_images_path :
+            from .vision_utils import load_image, load_image_new
 
             pixel_values = []
-            if isinstance(images_path, str):
-                images_path = [images_path]
-            for image_path in images_path:
-                pixel_values.append(load_image(image_path))
+            # if isinstance(images_path, str):
+            #     images_path = [images_path]
+            # for image_path in images_path:
+            #     pixel_values.append(load_image(image_path))
+            pixel_values.append(load_image_new(imgs_path=pre_images_path, max_num=1))
+            pixel_values.append(load_image_new(imgs_path=search_images_path, max_num=1))
             pixel_values = torch.cat(pixel_values, dim=0)
             image_bs = pixel_values.shape[0]
 
