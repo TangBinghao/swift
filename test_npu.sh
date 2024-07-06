@@ -7,12 +7,12 @@ export ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
 
 # 定义checkpoint的基目录
 # CKPT_BASE_DIR="output/minicpm-v-v2-chat/v0-20240621-192023"
-CKPT_BASE_DIR="/mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/mini-internvl-chat-4b-v1_5/v0-20240704-235123/"
+CKPT_BASE_DIR="/mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/internvl-v2/v0-20240705-224344/"
 
 # 定义要使用的步骤（step）列表
 # STEPS=(57 115 173 230 285)
 # STEPS=(3694 7388 11082 14776 18470 22164)
-STEPS=(1847 3694 5541 7388 9235 11082)
+STEPS=(1847 3694 5541 7388 9235 11082 12929 14776)
 
 # 定义其他参数
 CUSTOM_VAL_DATASET_PATH="/mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_test_mllm_swift_v2.jsonl"
