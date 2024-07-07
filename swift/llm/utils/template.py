@@ -1311,14 +1311,8 @@ class InternvlPhi3Template(InternvlTemplate):
     def __init__(self):
         Template.__init__(self, ['<s>'], ['<|user|>\n{{QUERY}}<|end|>\n<|assistant|>\n'], ['<|end|>\n'], ['<|end|>'],
                           self.system, ['<s><|system|>\n{{SYSTEM}}<|end|>\n'])
-# class Internvl2Template(InternvlTemplate):
 
-#     def __init__(self):
-#         self.system = '你是由上海人工智能实验室联合商汤科技开发的书生多模态大模型，英文名叫InternVL, 是一个有用无害的人工智能助手。'
-#         Template.__init__(self, [], ['<|im_start|>user\n{{QUERY}}<|im_end|><|im_start|>assistant\n'], ['<|im_end|>'],
-#                           ['<|im_end|>'], self.system, ['<|im_start|>system\n{{SYSTEM}}<|im_end|>'])
-class Internvl2Template(Template):
-    # system = 'You are an AI assistant whose name is InternLM (书生·浦语).'
+class Internvl2Template(InternvlTemplate):
     num_image_token = 256
 
     def __init__(self):
