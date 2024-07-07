@@ -7,13 +7,13 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --sft_type full \
     --model_type internvl-v2   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/ \
-    --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-4B \
+    --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-8B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_test_mllm_swift_v2.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 8 \
-    --max_length 6000 \
+    --max_length 8192 \
     --lora_rank 8 \
     --lora_alpha 32 \
     --lora_dropout_p 0.05 \
@@ -23,8 +23,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --weight_decay 0.01 \
     --learning_rate 5e-5 \
     --gradient_accumulation_steps 1 \
-    --eval_steps 6000 \
-    --save_steps 6000 \
+    --eval_steps 100000 \
+    --save_steps 100000 \
     --max_grad_norm 0.5 \
     --warmup_ratio 0.03 \
     --dtype bf16 \
@@ -42,13 +42,13 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --sft_type full \
     --model_type internvl-v2   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/ \
-    --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-4B \
+    --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-8B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_test_mllm_swift_v2.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 8 \
-    --max_length 6000 \
+    --max_length 8192 \
     --lora_rank 8 \
     --lora_alpha 32 \
     --lora_dropout_p 0.05 \
@@ -58,8 +58,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --weight_decay 0.01 \
     --learning_rate 5e-5 \
     --gradient_accumulation_steps 1 \
-    --eval_steps 6000 \
-    --save_steps 6000 \
+    --eval_steps 100000 \
+    --save_steps 100000 \
     --max_grad_norm 0.5 \
     --warmup_ratio 0.03 \
     --dtype bf16 \

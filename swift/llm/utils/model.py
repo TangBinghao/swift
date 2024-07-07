@@ -266,6 +266,7 @@ class ModelType:
     mini_internvl_chat_2b_v1_5 = 'mini-internvl-chat-2b-v1_5'
     mini_internvl_chat_4b_v1_5 = 'mini-internvl-chat-4b-v1_5'
     internvl_v2 = 'internvl-v2'
+    internvl_v2_4b = 'internvl-v2-4b'
     # deepseek
     deepseek_7b = 'deepseek-7b'
     deepseek_7b_chat = 'deepseek-7b-chat'
@@ -3604,6 +3605,16 @@ def fix_internvl_inplace_bug(model) -> None:
     'AI-ModelScope/InternVL-V2',
     LoRATM.internlm2,
     TemplateType.internvl2,
+    requires=['transformers>=4.35', 'timm'],
+    support_flash_attn=True,
+    placeholder_tokens=['<IMG_CONTEXT>'],
+    tags=['multi-modal', 'vision'],
+    hf_model_id='AI-ModelScope/InternVL-V1-5') # 乱写的路径
+@register_model(
+    ModelType.internvl_v2_4b,
+    'AI-ModelScope/InternVL-V2',
+    LoRATM.phi3,
+    TemplateType.internvl2_phi3,
     requires=['transformers>=4.35', 'timm'],
     support_flash_attn=True,
     placeholder_tokens=['<IMG_CONTEXT>'],
