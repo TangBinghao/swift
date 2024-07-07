@@ -13,7 +13,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 8 \
-    --max_length -1 \
+    --max_length 6000 \
     --lora_rank 8 \
     --lora_alpha 32 \
     --lora_dropout_p 0.05 \
@@ -30,6 +30,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --dtype bf16 \
     --ddp_backend=hccl \
     --save_on_each_node false \
+    --deepspeed default-zero3 \
 
 
 NNODES=2 \
@@ -47,7 +48,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 8 \
-    --max_length -1 \
+    --max_length 6000 \
     --lora_rank 8 \
     --lora_alpha 32 \
     --lora_dropout_p 0.05 \
@@ -64,5 +65,6 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --dtype bf16 \
     --ddp_backend=hccl \
     --save_on_each_node false \
+    --deepspeed default-zero3 \
     # --freeze_parameters 1 \
     # --additional_trainable_parameters language_model mlp1 \
