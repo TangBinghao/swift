@@ -5,8 +5,8 @@ NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
-    --model_type internvl-v2   \
-    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/internvl2-2b \
+    --model_type internvl-v2-2b   \
+    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_test_mllm_swift_v2.jsonl \
@@ -40,8 +40,8 @@ NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
-    --model_type internvl-v2   \
-    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output/internvl2-2b \
+    --model_type internvl-v2-2b   \
+    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_test_mllm_swift_v2.jsonl \
