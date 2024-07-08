@@ -157,7 +157,7 @@ class Template:
     """
 
     special_tokens = ['<image>', '<video_label>', '<audio_label>', '<bbox>', '<ref-object>']
-    special_keys = ['images', 'videos', 'audios', 'objects']
+    special_keys = ['images','pre_images','search_images', 'videos', 'audios', 'objects']
 
     def __init__(self,
                  prefix: Prompt,
@@ -266,7 +266,7 @@ class Template:
     def add_default_tags(self, example: Dict[str, Any]) -> None:
         history: History = deepcopy(example.get('history') or [])
         query: str = example.get('query') or ''
-        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'), ('audios', '<audio_label>')]:
+        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('audios', '<audio_label>')]:
             if example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{query}'):
                 infer_media_type = TEMPLATE_MAPPING[self.template_type].get('infer_media_type')
                 if infer_media_type == 'round':

@@ -5,7 +5,7 @@ NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
-    --model_type internvl-v2-2b   \
+    --model_type internvl2-2b   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
@@ -21,7 +21,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --gradient_checkpointing true \
     --batch_size 1 \
     --weight_decay 0.01 \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-5 \
     --gradient_accumulation_steps 1 \
     --eval_steps 100000 \
     --save_steps 100000 \
@@ -40,7 +40,7 @@ NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
-    --model_type internvl-v2-2b   \
+    --model_type internvl2-2b   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_new/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
     --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift-main/person_train_mllm_swift_v2.jsonl \
@@ -56,7 +56,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --gradient_checkpointing true \
     --batch_size 1 \
     --weight_decay 0.01 \
-    --learning_rate 5e-5 \
+    --learning_rate 1e-5 \
     --gradient_accumulation_steps 1 \
     --eval_steps 100000 \
     --save_steps 100000 \

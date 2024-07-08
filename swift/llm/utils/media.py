@@ -53,6 +53,8 @@ class MediaTag:
     media_keys = {
         'audio': 'audios',
         'image': 'images',
+        'image': 'pre_images',
+        'image': 'search_images',
         'video': 'videos',
     }
 
