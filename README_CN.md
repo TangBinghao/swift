@@ -48,6 +48,7 @@ SWIFT具有丰富的文档体系，如有使用问题请请查看[这里](https:
 可以在[Huggingface space](https://huggingface.co/spaces/tastelikefeet/swift) 和 [ModelScope创空间](https://www.modelscope.cn/studios/iic/Scalable-lightWeight-Infrastructure-for-Fine-Tuning/summary) 中体验SWIFT web-ui功能了。
 
 ## 🎉 新闻
+- 2024.07.08: 支持internlm-xcomposer2_5-7b-chat. 最佳实践可以查看[这里](docs/source/Multi-Modal/internlm-xcomposer2最佳实践.md).
 - 2024.07.06: 支持llava-next-video系列模型: llava-next-video-7b-instruct, llava-next-video-7b-32k-instruct, llava-next-video-7b-dpo-instruct, llava-next-video-34b-instruct. 可以查看[llava-video最佳实践](docs/source/Multi-Modal/llava-video最佳实践.md)了解更多.
 - 2024.07.06: 支持internvl-2系列: internvl2-2b, internvl2-4b, internvl2-8b, internvl2-26b.
 - 2024.07.06: 支持codegeex4-9b-chat.
@@ -551,7 +552,7 @@ CUDA_VISIBLE_DEVICES=0 swift deploy \
 | Qwen-VL                                   | [通义千问视觉模型](https://github.com/QwenLM)                                      | 中文<br>英文 | 7B<br>包含量化版本    | base模型<br>chat模型 |
 | Qwen-Audio                                | [通义千问语音模型](https://github.com/QwenLM)                                      | 中文<br>英文 | 7B              | base模型<br>chat模型 |
 | YI-VL                                     | [01AI的YI系列视觉模型](https://github.com/01-ai)                                  | 中文<br>英文 | 6B-34B          | chat模型          |
-| XComposer2                                | [浦江实验室书生浦语视觉模型](https://github.com/InternLM/InternLM)                      | 中文<br>英文 | 7B              | chat模型          |
+| XComposer2<br>XComposer2.5                | [浦江实验室书生浦语视觉模型](https://github.com/InternLM/InternLM-XComposer)                      | 中文<br>英文 | 7B              | chat模型          |
 | DeepSeek-VL                               | [幻方系列视觉模型](https://github.com/deepseek-ai)                                 | 中文<br>英文 | 1.3B-7B         | chat模型          |
 | MiniCPM-V<br>MiniCPM-V-2<br>MiniCPM-V-2_5 | [OpenBmB MiniCPM视觉模型](https://github.com/OpenBMB/MiniCPM)                  | 中文<br>英文 | 3B-9B           | chat模型          |
 | CogVLM<br>CogVLM2<br>CogAgent<br>GLM4V   | [智谱ChatGLM视觉问答和Agent模型](https://github.com/THUDM/)                         | 中文<br>英文 | 9B-19B         | chat模型          |
@@ -618,6 +619,19 @@ CUDA_VISIBLE_DEVICES=0 swift deploy \
 | 计算卡系列 T4/V100等    | 不支持BF16和FlashAttn       |
 | 计算卡系列 A10/A100等   | 支持BF16和FlashAttn        |
 | 华为昇腾NPU           |                         |
+
+
+### 环境变量
+
+- DATASET_ENABLE_CACHE：在预处理数据集时启用缓存，您可以使用`1/True`或`0/False`，默认值为`False`
+- WEBUI_SHARE：共享web-ui，可以使用`1/True`或`0/False`，默认值为`False`
+- SWIFT_UI_LANG：web-ui语言，您可以使用`en`或`zh`，默认值为`zh`
+- WEBUI_SERVER：web-ui可访问的IP`0.0.0.0`表示所有路由，`127.0.0.1`仅用于本地网络。默认值为`127.0.0.1`
+- WEBUI_PORT：web-ui端口
+- USE_HF：使用huggingface endpoint或ModelScope endpoint下载模型和数据集。您可以使用`1/True`或`0/False`，默认值为`False`
+- FORCE_REDOWNLOAD：强制重新下载数据集
+
+其他变量如`CUDA_VISIBLE_DEVICES`也支持，但未在此列出。
 
 
 ## 📃文档

@@ -47,6 +47,7 @@ SWIFT has rich documentations for users, please check [here](https://github.com/
 SWIFT web-ui is available both on [Huggingface space](https://huggingface.co/spaces/tastelikefeet/swift) and [ModelScope studio](https://www.modelscope.cn/studios/iic/Scalable-lightWeight-Infrastructure-for-Fine-Tuning/summary), please feel free to try!
 
 ## 🎉 News
+- 2024.07.08: Support internlm-xcomposer2_5-7b-chat. You can check the best practice [here](docs/source_en/Multi-Modal/internlm-xcomposer2-best-practice.md).
 - 2024.07.06: Support for the llava-next-video series models: llava-next-video-7b-instruct, llava-next-video-7b-32k-instruct, llava-next-video-7b-dpo-instruct, llava-next-video-34b-instruct. You can refer to [llava-video best practice](docs/source_en/Multi-Modal/llava-video-best-practice.md) for more information.
 - 2024.07.06: Support internvl2 series: internvl2-2b, internvl2-4b, internvl2-8b, internvl2-26b.
 - 2024.07.06: Support codegeex4-9b-chat.
@@ -554,7 +555,7 @@ The complete list of supported models and datasets can be found at [Supported Mo
 | Qwen-VL            | [Tongyi Qwen vision model](https://github.com/QwenLM)                        | Chinese<br>English | 7B<br>including quantized versions | base model<br>chat model |
 | Qwen-Audio         | [Tongyi Qwen speech model](https://github.com/QwenLM)                        | Chinese<br>English | 7B                                 | base model<br>chat model |
 | YI-VL              | [01AI's YI series vision models](https://github.com/01-ai)                   | Chinese<br>English | 6B-34B                             | chat model         |
-| XComposer2         | [Pujiang AI Lab InternLM vision model](https://github.com/InternLM/InternLM) | Chinese<br>English | 7B                                 | chat model         |
+| XComposer2<br>XComposer2.5         | [Pujiang AI Lab InternLM vision model](https://github.com/InternLM/InternLM-XComposer) | Chinese<br>English | 7B                                 | chat model         |
 | DeepSeek-VL        | [DeepSeek series vision models](https://github.com/deepseek-ai)              | Chinese<br>English | 1.3B-7B                            | chat model         |
 | MiniCPM-V<br>MiniCPM-V-2<br>MiniCPM-V-2_5  | [OpenBmB MiniCPM vision model](https://github.com/OpenBMB/MiniCPM) | Chinese<br>English | 3B-9B            | chat model          |
 | CogVLM<br>CogVLM2<br>CogAgent<br>GLM4V | [Zhipu ChatGLM visual QA and Agent model](https://github.com/THUDM/)         | Chinese<br>English | 9B-19B                            | chat model         |
@@ -622,6 +623,19 @@ The complete list of supported models and datasets can be found at [Supported Mo
 | Computing cards T4/V100, etc.  | BF16 and FlashAttn not supported                |
 | Computing cards A10/A100, etc. | Support BF16 and FlashAttn                      |
 | Huawei Ascend NPU              |                                                 |
+
+### Environment variables
+
+- DATASET_ENABLE_CACHE: Enable cache when preprocess dataset, you can use `1/True` or `0/False`, default `False`
+- WEBUI_SHARE: Share your web-ui, you can use `1/True` or `0/False`, default `False`
+- SWIFT_UI_LANG: web-ui language, you can use `en` or `zh`, default `zh`
+- WEBUI_SERVER: web-ui host ip，`0.0.0.0` for all routes，`127.0.0.1` for local network only. Default `127.0.0.1`
+- WEBUI_PORT: web-ui port
+- USE_HF: Use huggingface endpoint or ModelScope endpoint to download models and datasets. you can use `1/True` or `0/False`, default `False`
+- FORCE_REDOWNLOAD: Force to re-download the dataset
+
+Other variables like `CUDA_VISIBLE_DEVICES` are also supported, which are not listed here.
+
 
 ## 📃 Documentation
 
