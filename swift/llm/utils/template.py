@@ -1388,12 +1388,6 @@ class Internvl2Template(Template):
     def get_generate_ids(generate_ids: Tensor, input_token_len: int) -> List[int]:
         return generate_ids[0].tolist()
 
-class Internvl2Phi3Template(Internvl2Template):
-    system = 'You are an AI assistant whose name is Phi-3.'
-
-    def __init__(self):
-        Template.__init__(self, ['<s>'], ['<|user|>\n{{QUERY}}<|end|>\n<|assistant|>\n'], ['<|end|>\n'], ['<|end|>'],
-                          self.system, ['<s><|system|>\n{{SYSTEM}}<|end|>\n'])
 
 register_template(
     TemplateType.internvl,
@@ -1416,15 +1410,6 @@ register_template(
 register_template(
     TemplateType.internvl2,
     Internvl2Template(),
-    use_model=True,
-    lazy_tokenize=True,
-    infer_media_type='dialogue',
-    dataloader_num_workers=0,
-    dataloader_pin_memory=False)
-
-register_template(
-    TemplateType.internvl2_phi3,
-    Internvl2Phi3Template(),
     use_model=True,
     lazy_tokenize=True,
     infer_media_type='dialogue',
