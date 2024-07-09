@@ -426,6 +426,7 @@ class ModelType:
     cogvlm_17b_chat = 'cogvlm-17b-chat'
     cogvlm2_19b_chat = 'cogvlm2-19b-chat'  # chinese
     cogvlm2_en_19b_chat = 'cogvlm2-en-19b-chat'
+    cogvlm2_video_13b_chat = 'cogvlm2-video-13b-chat'
     cogagent_18b_chat = 'cogagent-18b-chat'
     cogagent_18b_instruct = 'cogagent-18b-instruct'
     # mamba
@@ -953,6 +954,16 @@ def get_model_tokenizer_from_repo(model_dir: str,
     return model, tokenizer
 
 
+@register_model(
+    ModelType.cogvlm2_video_13b_chat,
+    'ZhipuAI/cogvlm2-video-llama3-chat',
+    LoRATM.cogvlm,
+    TemplateType.cogvlm2_video,
+    support_gradient_checkpointing=False,
+    requires=['transformers<4.42', 'decord', 'pytorchvideo'],
+    placeholder_tokens=['<|reserved_special_token_0|>'],
+    tags=['multi-modal', 'vision', 'video'],
+    hf_model_id='THUDM/cogvlm2-video-llama3-chat')
 @register_model(
     ModelType.cogvlm2_en_19b_chat,
     'ZhipuAI/cogvlm2-llama3-chat-19B',
@@ -5283,12 +5294,13 @@ def get_model_tokenizer_llava(model_dir: str,
                               **kwargs):
     llm_model_type = kwargs.pop('llm_model_type')
     if 'local_repo_path' in kwargs:
-        repo_path = kwargs['local_repo_path']
+        local_repo_path = kwargs['local_repo_path']
     elif 'next' in llm_model_type:
         repo_path = 'https://github.com/LLaVA-VL/LLaVA-NeXT'
+        local_repo_path = _git_clone_github(repo_path)
     else:
         repo_path = 'https://github.com/haotian-liu/LLaVA'
-    local_repo_path = _git_clone_github(repo_path)
+        local_repo_path = _git_clone_github(repo_path)
     sys.path.append(os.path.join(local_repo_path))
 
     if llm_model_type == 'mistral':
