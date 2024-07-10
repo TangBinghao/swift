@@ -269,7 +269,7 @@ class Template:
     def add_default_tags(self, example: Dict[str, Any]) -> None:
         history: History = deepcopy(example.get('history') or [])
         query: str = example.get('query') or ''
-        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('pos_pre_images', '<image>'),('pos_search_images', '<image>'), ('neg_pre_images', '<image>'),('neg_search_images', '<image>'), ('audios', '<audio_label>')]:
+        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('audios', '<audio_label>')]:
             if example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{query}'):
                 infer_media_type = TEMPLATE_MAPPING[self.template_type].get('infer_media_type')
                 if infer_media_type == 'round':
@@ -291,6 +291,35 @@ class Template:
         example['query'] = query
         example['history'] = history
 
+    def add_default_tags_pair(self, example: Dict[str, Any]) -> None:
+        history: History = deepcopy(example.get('history') or [])
+        pos_query: str = example.get('pos_query') or ''
+        neg_query: str = example.get('neg_query') or ''
+        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('pos_pre_images', '<image>'),('pos_search_images', '<image>'), ('neg_pre_images', '<image>'),('neg_search_images', '<image>'), ('audios', '<audio_label>')]:
+            if example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{pos_query}') and example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{neg_query}'):
+                infer_media_type = TEMPLATE_MAPPING[self.template_type].get('infer_media_type')
+                if infer_media_type == 'round':
+                    assert len(example[media_key]) == len(history) + 1
+                    for h, m in zip(history, example[media_key][:-1]):
+                        if m:
+                            h[0] = media_tag + h[0]
+                    if example[media_key][-1]:
+                        pos_query = media_tag + pos_query
+                        neg_query = media_tag + neg_query
+                    example[media_key] = [m for m in example[media_key] if m]
+                else:
+                    example[media_key] = [m for m in example[media_key] if m]
+                    media_len = len(example[media_key])
+                    if history:
+                        history[0][0] = media_tag * media_len + history[0][0]
+                    else:
+                        pos_query = media_tag * media_len + pos_query
+                        neg_query = media_tag * media_len + neg_query
+
+        example['pos_query'] = pos_query
+        example['neg_query'] = neg_query
+        example['history'] = history
+    
     def _prepare_vllm_images(self, images: List['PIL.Image.Image']) -> List['PIL.Image.Image']:
         # Resize the image to fit the proper size.
         from PIL import Image
@@ -381,7 +410,7 @@ class Template:
             # change images field to list
             example['images'] = [example['images']]
         example = example.copy()
-        self.add_default_tags(example)
+        self.add_default_tags_pair(example)
         self.check_example(example)
         if example.get('objects') and isinstance(example['objects'], str):
             # reload grounding from str

@@ -397,6 +397,10 @@ class SmartPreprocessor:
                 'required': ['response'],
                 'preprocessor': SwiftPreprocessor()
             },
+            'swift': {
+                'required': ['pos_response', 'neg_response'],
+                'preprocessor': SwiftPreprocessor()
+            },
             'alpaca': {
                 'required': ['instruction', 'output'],
                 'preprocessor': AlpacaPreprocessor()
