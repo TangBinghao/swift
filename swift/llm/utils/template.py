@@ -160,7 +160,7 @@ class Template:
     """
 
     special_tokens = ['<image>', '<video_label>', '<audio_label>', '<bbox>', '<ref-object>']
-    special_keys = ['images','pre_images','search_images', 'videos', 'audios', 'objects']
+    special_keys = ['images','pre_images','search_images','pos_pre_images', 'pos_search_images', 'neg_pre_images', 'neg_search_images', 'videos', 'audios', 'objects']
 
     def __init__(self,
                  prefix: Prompt,
@@ -269,7 +269,7 @@ class Template:
     def add_default_tags(self, example: Dict[str, Any]) -> None:
         history: History = deepcopy(example.get('history') or [])
         query: str = example.get('query') or ''
-        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('audios', '<audio_label>')]:
+        for media_key, media_tag in [('videos', '<video_label>'), ('images', '<image>'),('pre_images', '<image>'),('search_images', '<image>'), ('pos_pre_images', '<image>'),('pos_search_images', '<image>'), ('neg_pre_images', '<image>'),('neg_search_images', '<image>'), ('audios', '<audio_label>')]:
             if example.get(media_key) and media_tag not in ('\n'.join([h[0] for h in history]) + f'\n{query}'):
                 infer_media_type = TEMPLATE_MAPPING[self.template_type].get('infer_media_type')
                 if infer_media_type == 'round':
@@ -372,6 +372,84 @@ class Template:
             inputs.pop('loss_scale', None)
         return inputs, tokenizer_kwargs
 
+    def encode_pair(self, example: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
+        """return: inputs, tokenizer_kwargs"""
+        if not self._is_init:
+            raise ValueError(
+                'Template is not initialized, please use the `get_template` function to obtain the template.')
+        if example.get('images') and not isinstance(example['images'], (tuple, list)):
+            # change images field to list
+            example['images'] = [example['images']]
+        example = example.copy()
+        self.add_default_tags(example)
+        self.check_example(example)
+        if example.get('objects') and isinstance(example['objects'], str):
+            # reload grounding from str
+            example['objects'] = json.loads(example['objects'])
+        query: str = example.get('query') or ''
+        query_role: str = example.get('query_role') or 'user'
+        response: Optional[str] = example.get('response')
+        history: History = example.get('history') or []
+        history_roles: Optional[History] = example.get('history_roles')
+        system: Optional[str] = example.get('system', None)
+        template_type: Optional[str] = getattr(self, 'template_type', None)
+        tools: Union[List[Any], str] = example.get('tools') or []
+        is_multi_modal: bool = any([example.get(key) for key in Template.special_keys])
+
+        pos_query: str = example.get('pos_query') or ''
+        pos_response: Optional[str] = example.get('pos_response')
+        neg_query: str = example.get('neg_query') or ''
+        neg_response: Optional[str] = example.get('neg_response')
+
+        if len(history) > 0:
+            assert self.support_multi_round, (
+                f'The template does not support multi-round chat, template_type: {template_type}')
+        if system is None:
+            if self.use_default_system:
+                system = self.default_system
+        elif system == '':
+            system = None
+        else:
+            assert self.system_prefix is not None, (
+                f'The template does not support `system`, template_type: {template_type}')
+        if tools:
+            if isinstance(tools, str):
+                tools = json.loads(tools)
+            if system is None:
+                system = ''
+            system += get_tools_prompt(tools, self.tools_prompt)
+        if history_roles is None:
+            history_roles = [['user', 'assistant'] for _ in range(len(history))]
+
+        pos_inputs, tokenizer_kwargs = self._encode(
+            pos_query,
+            query_role,
+            pos_response,
+            history,
+            history_roles,
+            system,
+            self.truncation_strategy,
+            auto_add_bos=self.auto_add_bos,
+            example=example,
+            is_multi_modal=is_multi_modal)
+        if pos_inputs.get('labels') is None:
+            pos_inputs.pop('loss_scale', None)
+        neg_inputs, tokenizer_kwargs = self._encode(
+            neg_query,
+            query_role,
+            neg_response,
+            history,
+            history_roles,
+            system,
+            self.truncation_strategy,
+            auto_add_bos=self.auto_add_bos,
+            example=example,
+            is_multi_modal=is_multi_modal)
+        if neg_inputs.get('labels') is None:
+            neg_inputs.pop('loss_scale', None)
+        pair_inputs = {'pos': pos_inputs, 'neg': neg_inputs}
+        return pair_inputs, tokenizer_kwargs
+    
     def _concat_context_list(
             self,
             context_list: List[Context],
@@ -687,6 +765,145 @@ class Template:
             res['pixel_values_videos'] = torch.concat(pixel_values_videos)
         if loss_scale is not None:
             res['loss_scale'] = loss_scale
+        return res
+
+    def data_collator_pair(self, batch: List[Dict[str, Any]], padding_to: Optional[int] = None) -> Dict[str, Any]:
+        """
+        Args:
+            batch(`List[Dict[str, Any]]`): The input data in batch
+            padding_to(`int`, optional): Whether padding the batch to a fixed length, if none, the batch
+                will be padded to the `longest`
+        """
+        tokenizer = self.tokenizer
+        assert tokenizer.pad_token_id is not None
+        pos_inputs_embeds, pos_input_ids, neg_inputs_embeds, neg_input_ids, = None, None, None, None
+        if 'inputs_embeds' in batch[0]['pos'] and 'inputs_embeds' in batch[0]['neg']:
+            pos_inputs_embeds = [b['pos']['inputs_embeds'] for b in batch]
+            pos_attention_mask = [
+                torch.ones((pos_inputs_embeds[i].shape[0]), dtype=torch.int64) for i in range(len(pos_inputs_embeds))
+            ]
+            neg_inputs_embeds = [b['neg']['inputs_embeds'] for b in batch]
+            neg_attention_mask = [
+                torch.ones((neg_inputs_embeds[i].shape[0]), dtype=torch.int64) for i in range(len(neg_inputs_embeds))
+            ]
+        else:
+            pos_input_ids = [torch.tensor(b['pos']['input_ids']) for b in batch]
+            pos_attention_mask = [torch.ones(len(pos_input_ids[i]), dtype=torch.int64) for i in range(len(pos_input_ids))]
+            neg_input_ids = [torch.tensor(b['neg']['input_ids']) for b in batch]
+            neg_attention_mask = [torch.ones(len(neg_input_ids[i]), dtype=torch.int64) for i in range(len(neg_input_ids))]
+        
+        pos_labels = [torch.tensor(b['pos']['labels']) for b in batch]
+        neg_labels = [torch.tensor(b['neg']['labels']) for b in batch]
+        pos_loss_scale = [torch.tensor(b['pos']['loss_scale']) for b in batch] if 'loss_scale' in batch[0]['pos'] else None
+        neg_loss_scale = [torch.tensor(b['neg']['loss_scale']) for b in batch] if 'loss_scale' in batch[0]['neg'] else None
+
+        if padding_to is not None:
+            assert pos_input_ids is not None  # inputs_embeds not support padding_to
+            assert neg_input_ids is not None  # inputs_embeds not support padding_to
+            pos_padding_len = padding_to - pos_input_ids[0].shape[-1]
+            neg_padding_len = padding_to - neg_input_ids[0].shape[-1]
+            if pos_padding_len > 0:
+                pos_input_ids[0] = F.pad(pos_input_ids[0], (0, pos_padding_len), 'constant', tokenizer.pad_token_id)
+                pos_attention_mask[0] = F.pad(pos_attention_mask[0], (0, pos_padding_len), 'constant', 0)
+                pos_labels[0] = F.pad(pos_labels[0], (0, pos_padding_len), 'constant', -100)
+                if pos_loss_scale:
+                    pos_loss_scale[0] = F.pad(pos_loss_scale[0], (0, padding_to - pos_labels[0].shape[-1]), 'constant', 0.)
+            if neg_padding_len > 0:
+                neg_input_ids[0] = F.pad(neg_input_ids[0], (0, neg_padding_len), 'constant', tokenizer.pad_token_id)
+                neg_attention_mask[0] = F.pad(neg_attention_mask[0], (0, neg_padding_len), 'constant', 0)
+                neg_labels[0] = F.pad(neg_labels[0], (0, neg_padding_len), 'constant', -100)
+                if neg_loss_scale:
+                    neg_loss_scale[0] = F.pad(neg_loss_scale[0], (0, padding_to - neg_labels[0].shape[-1]), 'constant', 0.)
+
+        if pos_input_ids is None:
+            pos_inputs_embeds = pad_sequence(pos_inputs_embeds, batch_first=True, padding_value=0)
+        else:
+            pos_input_ids = pad_sequence(pos_input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
+        pos_attention_mask = pad_sequence(pos_attention_mask, batch_first=True, padding_value=0)
+        if pos_loss_scale:
+            pos_loss_scale = pad_sequence(pos_loss_scale, batch_first=True, padding_value=0.)
+        pos_labels = pad_sequence(pos_labels, batch_first=True, padding_value=-100)
+
+        if neg_input_ids is None:
+            neg_inputs_embeds = pad_sequence(neg_inputs_embeds, batch_first=True, padding_value=0)
+        else:
+            neg_input_ids = pad_sequence(neg_input_ids, batch_first=True, padding_value=tokenizer.pad_token_id)
+        neg_attention_mask = pad_sequence(neg_attention_mask, batch_first=True, padding_value=0)
+        if neg_loss_scale:
+            neg_loss_scale = pad_sequence(neg_loss_scale, batch_first=True, padding_value=0.)
+        neg_labels = pad_sequence(neg_labels, batch_first=True, padding_value=-100)
+
+        if use_torchacc():
+            # TODO not used at now
+            rank, _, world_size, _ = get_dist_setting()
+            input_ids, attention_mask, labels, loss_scale = pad_and_split_batch(padding_to, input_ids, attention_mask,
+                                                                                labels, loss_scale, self.max_length,
+                                                                                self.tokenizer, rank, world_size)
+        if pos_input_ids is not None:
+            pos_bs, pos_seq_len = pos_input_ids.shape
+            pos_position_ids = torch.arange(pos_seq_len).unsqueeze(0).long().repeat(pos_bs, 1)
+
+            if self.sequence_parallel_size > 1:
+                from swift.trainers.xtuner import get_xtuner_sequence_parallel_world_size
+                if get_xtuner_sequence_parallel_world_size() > 1:
+                    from swift.trainers.xtuner import pad_and_split_for_sequence_parallel
+                    pos_input_ids, pos_labels, pos_position_ids, pos_attention_mask, pos_loss_scale = \
+                        pad_and_split_for_sequence_parallel(
+                            tokenizer, pos_input_ids, pos_labels, pos_position_ids, pos_attention_mask, pos_loss_scale)
+        if neg_input_ids is not None:
+            neg_bs, neg_seq_len = neg_input_ids.shape
+            neg_position_ids = torch.arange(neg_seq_len).unsqueeze(0).long().repeat(neg_bs, 1)
+
+            if self.sequence_parallel_size > 1:
+                from swift.trainers.xtuner import get_xtuner_sequence_parallel_world_size
+                if get_xtuner_sequence_parallel_world_size() > 1:
+                    from swift.trainers.xtuner import pad_and_split_for_sequence_parallel
+                    neg_input_ids, neg_labels, neg_position_ids, neg_attention_mask, neg_loss_scale = \
+                        pad_and_split_for_sequence_parallel(
+                            tokenizer, neg_input_ids, neg_labels, neg_position_ids, neg_attention_mask, neg_loss_scale)
+        res = {
+            'pos_attention_mask': pos_attention_mask,
+            'pos_labels': pos_labels,
+            'neg_attention_mask': neg_attention_mask,
+            'neg_labels': neg_labels,
+        }
+        if pos_inputs_embeds is not None:
+            res['pos_inputs_embeds'] = pos_inputs_embeds
+        else:
+            res['pos_input_ids'] = pos_input_ids
+        if neg_inputs_embeds is not None:
+            res['neg_inputs_embeds'] = neg_inputs_embeds
+        else:
+            res['neg_input_ids'] = neg_input_ids
+        
+        # multimodal
+        pos_pixel_values = [b['pos']['pixel_values'] for b in batch if b['pos'].get('pixel_values') is not None]
+        if len(pos_pixel_values) > 0:
+            res['pos_pixel_values'] = torch.concat(pos_pixel_values)
+
+            pos_image_sizes = [b['pos']['image_sizes'] for b in batch if b['pos'].get('image_sizes') is not None]
+            if len(pos_image_sizes) > 0:
+                res['pos_image_sizes'] = torch.concat(pos_image_sizes)
+
+        pos_pixel_values_videos = [b['pos']['pixel_values_videos'] for b in batch if b['pos'].get('pixel_values_videos') is not None]
+        if len(pos_pixel_values_videos) > 0:
+            res['pos_pixel_values_videos'] = torch.concat(pos_pixel_values_videos)
+        if pos_loss_scale is not None:
+            res['pos_loss_scale'] = pos_loss_scale
+        
+        neg_pixel_values = [b['neg']['pixel_values'] for b in batch if b['neg'].get('pixel_values') is not None]
+        if len(neg_pixel_values) > 0:
+            res['neg_pixel_values'] = torch.concat(neg_pixel_values)
+
+            neg_image_sizes = [b['neg']['image_sizes'] for b in batch if b['neg'].get('image_sizes') is not None]
+            if len(pos_image_sizes) > 0:
+                res['neg_image_sizes'] = torch.concat(neg_image_sizes)
+
+        neg_pixel_values_videos = [b['neg']['pixel_values_videos'] for b in batch if b['neg'].get('pixel_values_videos') is not None]
+        if len(neg_pixel_values_videos) > 0:
+            res['neg_pixel_values_videos'] = torch.concat(neg_pixel_values_videos)
+        if neg_loss_scale is not None:
+            res['neg_loss_scale'] = neg_loss_scale
         return res
 
     @staticmethod
@@ -1398,29 +1615,26 @@ class Internvl2Template(Template):
         return [[-100]]
 
     def encode(self, example: Dict[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-        inputs, _ = super().encode(example)
-        if len(inputs) == 0:
-            return inputs, {}
-        input_ids = inputs['input_ids']
-        idx_list = _findall(input_ids, -100)
-        labels = inputs.get('labels')
-        images_path = example.get('images') or []
-        pre_images_path = example.get('pre_images') or []
-        search_images_path = example.get('search_images') or []
-        if search_images_path and pre_images_path :
+        inputs, _ = super().encode_pair(example)
+
+        pos_inputs = inputs['pos']
+        
+        pos_input_ids = pos_inputs['input_ids']
+        pos_idx_list = _findall(pos_input_ids, -100)
+        pos_labels = pos_inputs.get('labels')
+
+        pos_pre_images_path = example.get('pos_pre_images') or []
+        pos_search_images_path = example.get('pos_search_images') or []
+        if pos_pre_images_path and pos_search_images_path :
             from .vision_utils import load_image, load_image_new, load_image_tbh
 
             pixel_values = []
             num_patches_list = []
-            # if isinstance(images_path, str):
-            #     images_path = [images_path]
-            # for image_path in images_path:
-            #     pixel_values.append(load_image(image_path))
-            for pre_image_path in pre_images_path:
+            for pre_image_path in pos_pre_images_path:
                 pixel_value = load_image_tbh(pre_image_path,max_num=1)
                 pixel_values.append(pixel_value)
                 num_patches_list.append(pixel_value.size(0))
-            for search_image_path in search_images_path:
+            for search_image_path in pos_search_images_path:
                 pixel_value = load_image_tbh(search_image_path,max_num=1)
                 pixel_values.append(pixel_value)
                 num_patches_list.append(pixel_value.size(0))
@@ -1429,31 +1643,76 @@ class Internvl2Template(Template):
             pixel_values = torch.cat(pixel_values, dim=0)
             image_bs = pixel_values.shape[0]
 
-            idx, idx2 = idx_list[0], idx_list[-1]  # remove [-100, -100]
+            idx, idx2 = pos_idx_list[0], pos_idx_list[-1]  # remove [-100, -100]
             # img_tokens: List[int] = self.tokenizer.encode(
             #     '<img>' + '<IMG_CONTEXT>' * self.num_image_token * image_bs + '</img>\n', add_special_tokens=False)
             img_tokens = []
             for num_patches in num_patches_list:
                 img_tokens += self.tokenizer.encode(
                 '<img>' + '<IMG_CONTEXT>' * self.num_image_token * num_patches + '</img>\n', add_special_tokens=False)
-            input_ids = input_ids[:idx] + img_tokens + input_ids[idx2 + 1:]
-            if labels is not None:
-                labels = labels[:idx] + [-100] * len(img_tokens) + labels[idx2 + 1:]
-            inputs['input_ids'] = input_ids
-            inputs['labels'] = labels
+            pos_input_ids = pos_input_ids[:idx] + img_tokens + pos_input_ids[idx2 + 1:]
+            if pos_labels is not None:
+                pos_labels = pos_labels[:idx] + [-100] * len(img_tokens) + pos_labels[idx2 + 1:]
+            pos_inputs['input_ids'] = pos_input_ids
+            pos_inputs['labels'] = pos_labels
 
-            inputs['pixel_values'] = pixel_values.to(self.model.dtype)
-            inputs['image_flags'] = torch.ones(image_bs)
+            pos_inputs['pixel_values'] = pixel_values.to(self.model.dtype)
+            pos_inputs['image_flags'] = torch.ones(image_bs)
+        pos_inputs.pop('loss_scale', None)
+        
+        neg_inputs = inputs['neg']
+        neg_input_ids = neg_inputs['input_ids']
+        neg_idx_list = _findall(neg_input_ids, -100)
+        neg_labels = neg_inputs.get('labels')
 
-        inputs.pop('loss_scale', None)
-        return inputs, {}
+        neg_pre_images_path = example.get('neg_pre_images') or []
+        neg_search_images_path = example.get('neg_search_images') or []
+        if neg_pre_images_path and neg_search_images_path :
+            from .vision_utils import load_image, load_image_new, load_image_tbh
+
+            pixel_values = []
+            num_patches_list = []
+            for pre_image_path in neg_pre_images_path:
+                pixel_value = load_image_tbh(pre_image_path,max_num=1)
+                pixel_values.append(pixel_value)
+                num_patches_list.append(pixel_value.size(0))
+            for search_image_path in neg_search_images_path:
+                pixel_value = load_image_tbh(search_image_path,max_num=1)
+                pixel_values.append(pixel_value)
+                num_patches_list.append(pixel_value.size(0))
+            # pixel_values.append(load_image_new(imgs_path=pre_images_path, max_num=1))
+            # pixel_values.append(load_image_new(imgs_path=search_images_path, max_num=1))
+            pixel_values = torch.cat(pixel_values, dim=0)
+            image_bs = pixel_values.shape[0]
+
+            idx, idx2 = neg_idx_list[0], neg_idx_list[-1]  # remove [-100, -100]
+            # img_tokens: List[int] = self.tokenizer.encode(
+            #     '<img>' + '<IMG_CONTEXT>' * self.num_image_token * image_bs + '</img>\n', add_special_tokens=False)
+            img_tokens = []
+            for num_patches in num_patches_list:
+                img_tokens += self.tokenizer.encode(
+                '<img>' + '<IMG_CONTEXT>' * self.num_image_token * num_patches + '</img>\n', add_special_tokens=False)
+            neg_input_ids = neg_input_ids[:idx] + img_tokens + neg_input_ids[idx2 + 1:]
+            if neg_labels is not None:
+                neg_labels = neg_labels[:idx] + [-100] * len(img_tokens) + neg_labels[idx2 + 1:]
+            neg_inputs['input_ids'] = neg_input_ids
+            neg_inputs['labels'] = neg_labels
+
+            neg_inputs['pixel_values'] = pixel_values.to(self.model.dtype)
+            neg_inputs['image_flags'] = torch.ones(image_bs)
+        neg_inputs.pop('loss_scale', None)
+        pair_inputs = {'pos': pos_inputs, 'neg': neg_inputs}
+        return pair_inputs, {}
 
     def data_collator(self, batch: List[Dict[str, Any]], padding_to: Optional[int] = None) -> Dict[str, Any]:
-        res = super().data_collator(batch, padding_to)
-        assert all('pixel_values' in b for b in batch), 'Temporarily, Interval only supports data with images'
-        image_flags = [b['image_flags'] for b in batch if 'image_flags' in b]
-        if image_flags:
-            res['image_flags'] = torch.concat(image_flags)
+        res = super().data_collator_pair(batch, padding_to)
+        assert all('pixel_values' in b['pos'] for b in batch) and all('pixel_values' in b['neg'] for b in batch), 'Temporarily, Interval only supports data with images'
+        pos_image_flags = [b['pos']['image_flags'] for b in batch if 'image_flags' in b['pos']]
+        if pos_image_flags:
+            res['pos_image_flags'] = torch.concat(pos_image_flags)
+        neg_image_flags = [b['neg']['image_flags'] for b in batch if 'image_flags' in b['neg']]
+        if neg_image_flags:
+            res['neg_image_flags'] = torch.concat(neg_image_flags)
         return res
 
     @staticmethod
