@@ -168,6 +168,7 @@ class Seq2SeqTrainer(PushToMsHubMixin, SwiftMixin, HfSeq2SeqTrainer):
         return loss.mean()
 
     def compute_loss(self, model, inputs, return_outputs=None):
+        print("inputs",inputs)
         if not hasattr(self, '_custom_metrics'):
             self._custom_metrics = {}
 

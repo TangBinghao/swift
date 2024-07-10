@@ -45,6 +45,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --save_total_limit -1 \
     --num_train_epochs 5 \
     --max_length 8192 \
+    --gradient_checkpointing true \
     --batch_size 1 \
     --weight_decay 0.01 \
     --learning_rate 1e-4 \
