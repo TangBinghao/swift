@@ -180,18 +180,28 @@ class Seq2SeqTrainer(PushToMsHubMixin, SwiftMixin, HfSeq2SeqTrainer):
         shift_neg_labels = neg_labels[..., 1:]
         
         # Get the scores for the token_id at the label positions
-        pos_scores = pos_logits[..., :-1, level1]
-        neg_scores = neg_logits[..., :-1, level1]
+        pos_scores_level1 = pos_logits[..., :-1, level1]
+        neg_scores_level1 = neg_logits[..., :-1, level1]
+        pos_scores_level0 = pos_logits[..., :-1, level0]
+        neg_scores_level0 = neg_logits[..., :-1, level0]
         
         # Mask to ignore padding tokens
         pos_masks = shift_pos_labels != -100
         neg_masks = shift_neg_labels != -100
-        pos_scores = pos_scores[pos_masks]
-        neg_scores = neg_scores[neg_masks]
+        pos_scores_level1 = pos_scores_level1[pos_masks]
+        neg_scores_level1 = neg_scores_level1[neg_masks]
+        pos_scores_level0 = pos_scores_level0[pos_masks]
+        neg_scores_level0 = neg_scores_level0[neg_masks]
         
-        # Compute margin loss
-        margin_loss = torch.clamp(margin - (pos_scores - neg_scores), min=0.0)
-        return margin_loss.mean()
+        # Compute margin loss for level1
+        margin_loss_level1 = torch.clamp(margin - (pos_scores_level1 - neg_scores_level1), min=0.0)
+        
+        # Compute margin loss for level0
+        margin_loss_level0 = torch.clamp(margin - (neg_scores_level0 - pos_scores_level0), min=0.0)
+        
+        # Combine the two margin losses
+        total_margin_loss = margin_loss_level1.mean() + margin_loss_level0.mean()
+        return total_margin_loss
 
     def compute_loss(self, model, inputs, return_outputs=None):
         # print(inputs.keys()) 
