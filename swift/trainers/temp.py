@@ -41,8 +41,7 @@ class Seq2SeqTrainer(PushToMsHubMixin, SwiftMixin, HfSeq2SeqTrainer):
             'gen_time': 0.,
             'gen_len': 0,
         })
-        self._pos_acc = torch.tensor(0.).to(self.args.device)
-        self._neg_acc = torch.tensor(0.).to(self.args.device)
+        self._acc = torch.tensor(0.).to(self.args.device)
         if self.sequence_parallel_size > 1:
             from swift.trainers.xtuner import init_sequence_parallel_xtuner
             init_sequence_parallel_xtuner(self.sequence_parallel_size)
@@ -167,193 +166,79 @@ class Seq2SeqTrainer(PushToMsHubMixin, SwiftMixin, HfSeq2SeqTrainer):
         loss = loss_fct(shift_logits, shift_labels)
         loss = shift_scale * loss
         return loss.mean()
-    
-    @staticmethod
-    def compute_margin_loss(pos_logits: torch.Tensor, neg_logits: torch.Tensor, pos_labels: torch.Tensor, neg_labels: torch.Tensor, tokenizer, margin: float = 0.2) -> torch.Tensor:
-        # logits: bsz, seq_len, vocab_size
-        # labels: bsz, seq_len
-        device = pos_logits.device
-        label_ids = [x[-1] for x in tokenizer(['0', '1']).input_ids]
-        level0, level1 = label_ids
-        # Shift labels to align with logits
-        shift_pos_labels = pos_labels[..., 1:]
-        shift_neg_labels = neg_labels[..., 1:]
-        
-        # Get the scores for the token_id at the label positions
-        pos_scores = pos_logits[..., :-1, level1]
-        neg_scores = neg_logits[..., :-1, level1]
-        
-        # Mask to ignore padding tokens
-        pos_masks = shift_pos_labels != -100
-        neg_masks = shift_neg_labels != -100
-        pos_scores = pos_scores[pos_masks]
-        neg_scores = neg_scores[neg_masks]
-        
-        # Compute margin loss
-        margin_loss = torch.clamp(margin - (pos_scores - neg_scores), min=0.0)
-        return margin_loss.mean()
 
     def compute_loss(self, model, inputs, return_outputs=None):
-        # print(inputs.keys()) 
-        # dict_keys(['pos_attention_mask', 'pos_labels', 'neg_attention_mask', 
-        # 'neg_labels', 'pos_input_ids', 'neg_input_ids', 
-        # 'pos_pixel_values', 'neg_pixel_values',
-        #  'pos_image_flags', 'neg_image_flags'])
-        pos_inputs = {
-            'attention_mask': inputs['pos_attention_mask'],
-            'labels': inputs['pos_labels'],
-            'input_ids': inputs['pos_input_ids'],
-            'pixel_values': inputs['pos_pixel_values'],
-            'image_flags': inputs['pos_image_flags']
-        }
-        neg_inputs = {
-            'attention_mask': inputs['neg_attention_mask'],
-            'labels': inputs['neg_labels'],
-            'input_ids': inputs['neg_input_ids'],
-            'pixel_values': inputs['neg_pixel_values'],
-            'image_flags': inputs['neg_image_flags']
-        }
         if not hasattr(self, '_custom_metrics'):
             self._custom_metrics = {}
 
-        pos_labels, neg_labels = None, None
-        pos_loss_scale, neg_loss_scale = None, None
-        if 'pos_loss_scale' in inputs:
-            pos_labels = inputs.pop('pos_labels')
-            pos_loss_scale = inputs.pop('pos_loss_scale')
-        if 'neg_loss_scale' in inputs:
-            neg_labels = inputs.pop('neg_labels')
-            neg_loss_scale = inputs.pop('neg_loss_scale')
+        labels = None
+        loss_scale = None
+        if 'loss_scale' in inputs:
+            labels = inputs.pop('labels')
+            loss_scale = inputs.pop('loss_scale')
 
-        if self.label_smoother is not None and 'pos_labels' in inputs:
-            pos_labels = inputs.pop('pos_labels')
-        if self.label_smoother is not None and 'neg_labels' in inputs:
-            neg_labels = inputs.pop('neg_labels')
+        if self.label_smoother is not None and 'labels' in inputs:
+            labels = inputs.pop('labels')
 
-        pos_outputs = model(**pos_inputs)
-        if pos_loss_scale is not None:
-            # print("pos_labels",pos_labels)
-            pos_outputs['loss'] = self.compute_scaled_loss(pos_labels, pos_outputs.logits, pos_loss_scale)
-        neg_outputs = model(**neg_inputs)
-        if neg_loss_scale is not None:
-            neg_outputs['loss'] = self.compute_scaled_loss(neg_labels, neg_outputs.logits, neg_loss_scale)
-
+        outputs = model(**inputs)
+        if loss_scale is not None:
+            outputs['loss'] = self.compute_scaled_loss(labels, outputs.logits, loss_scale)
 
         # Save past state if it exists
         # TODO: this needs to be fixed and made cleaner later.
         if self.args.past_index >= 0:
-            self._past_pos = pos_outputs[self.args.past_index]
-            self._past_neg = neg_outputs[self.args.past_index] # TODO: tbh: i don't know _past is what?
+            self._past = outputs[self.args.past_index]
 
-        if pos_labels is not None and pos_loss_scale is None:
+        if labels is not None and loss_scale is None:
             unwrapped_model = unwrap_model(model)
             if is_peft_available() and isinstance(unwrapped_model, PeftModel):
                 model_name = unwrapped_model.base_model.model._get_name()
             else:
                 model_name = unwrapped_model._get_name()
             if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
-                pos_loss = self.label_smoother(pos_outputs, pos_labels, shift_labels=True)
+                loss = self.label_smoother(outputs, labels, shift_labels=True)
             else:
-                pos_loss = self.label_smoother(pos_outputs, pos_labels)
+                loss = self.label_smoother(outputs, labels)
         else:
-            # print("pos_labels None?")
-            pos_loss = pos_outputs['loss'] if isinstance(pos_outputs, dict) else pos_outputs[0]
-        
-        if neg_labels is not None and neg_loss_scale is None:
-            unwrapped_model = unwrap_model(model)
-            if is_peft_available() and isinstance(unwrapped_model, PeftModel):
-                model_name = unwrapped_model.base_model.model._get_name()
-            else:
-                model_name = unwrapped_model._get_name()
-            if model_name in MODEL_FOR_CAUSAL_LM_MAPPING_NAMES.values():
-                neg_loss = self.label_smoother(neg_outputs, neg_labels, shift_labels=True)
-            else:
-                neg_loss = self.label_smoother(neg_outputs, neg_labels)
-        else:
-            neg_loss = neg_outputs['loss'] if isinstance(neg_outputs, dict) else neg_outputs[0]
+            loss = outputs['loss'] if isinstance(outputs, dict) else outputs[0]
 
         if self.sequence_parallel_size > 1:
             from swift.trainers.xtuner import reduce_xtuner_sequence_parallel_loss
-            pos_loss = reduce_xtuner_sequence_parallel_loss(pos_loss, pos_labels)
-            neg_loss = reduce_xtuner_sequence_parallel_loss(neg_loss, neg_labels)
+            loss = reduce_xtuner_sequence_parallel_loss(loss, labels)
 
-        
-        if pos_labels is None:
-            pos_labels = inputs['pos_labels']
-        if neg_labels is None:
-            neg_labels = inputs['neg_labels']
-        
-        margin_loss = self.compute_margin_loss(pos_outputs.logits, neg_outputs.logits, pos_labels, neg_labels, self.tokenizer)
-
-        if self.is_encoder_decoder: # tbh: do not use 
-            pos_preds = pos_outputs.logits.argmax(dim=2)[..., :]
-            pos_labels = pos_labels[..., :]
-            neg_preds = neg_outputs.logits.argmax(dim=2)[..., :]
-            neg_labels = neg_labels[..., :]
+        if labels is None:
+            labels = inputs['labels']
+        if self.is_encoder_decoder:
+            preds = outputs.logits.argmax(dim=2)[..., :]
+            labels = labels[..., :]
         else:
-            pos_preds = pos_outputs.logits.argmax(dim=2)[..., :-1]
-            pos_labels = pos_labels[..., 1:]
-            neg_preds = neg_outputs.logits.argmax(dim=2)[..., :-1]
-            neg_labels = neg_labels[..., 1:]
+            preds = outputs.logits.argmax(dim=2)[..., :-1]
+            labels = labels[..., 1:]
 
-        pos_masks = pos_labels != -100
-        neg_masks = neg_labels != -100
+        masks = labels != -100
         acc_strategy = getattr(self.args, 'acc_strategy', 'token')
-        pos_acc: Optional[Tensor] = None
-        neg_acc: Optional[Tensor] = None
+        acc: Optional[Tensor] = None
 
         if self.state.global_step % self.sft_args.acc_steps == 0:
-            if pos_preds.shape != pos_labels.shape:
+            if preds.shape != labels.shape:
                 pass
             elif acc_strategy == 'sentence':
-                pos_acc_list = []
-                for i, m in enumerate(pos_masks):
-                    pos_acc_list.append(torch.all(pos_preds[i, m] == pos_labels[i, m]).to(torch.int64).item())
-                pos_acc = torch.tensor(pos_acc_list, device=pos_preds.device).float().mean()
+                acc_list = []
+                for i, m in enumerate(masks):
+                    acc_list.append(torch.all(preds[i, m] == labels[i, m]).to(torch.int64).item())
+                acc = torch.tensor(acc_list, device=preds.device).float().mean()
             else:
-                if use_torchacc(): # tbh: not used
+                if use_torchacc():
                     ta_trim_graph()
-                    pos_preds = pos_preds.to('cpu')
-                    pos_masks = pos_masks.to('cpu')
-                    pos_labels = pos_labels.to('cpu')
-                pos_acc = (torch.masked_select(pos_preds, pos_masks) == torch.masked_select(pos_labels, pos_masks)).float().mean()
-            if model.training and pos_acc is not None:
-                if 'pos_acc' not in self._custom_metrics:
-                    self._custom_metrics['pos_acc'] = self._pos_acc
-                self._custom_metrics['pos_acc'] = self._custom_metrics['pos_acc'] + pos_acc / self.args.gradient_accumulation_steps
-        if self.state.global_step % self.sft_args.acc_steps == 0:
-            if neg_preds.shape != neg_labels.shape:
-                pass
-            elif acc_strategy == 'sentence':
-                neg_acc_list = []
-                for i, m in enumerate(neg_masks):
-                    neg_acc_list.append(torch.all(neg_preds[i, m] == neg_labels[i, m]).to(torch.int64).item())
-                neg_acc = torch.tensor(neg_acc_list, device=neg_preds.device).float().mean()
-            else:
-                if use_torchacc(): # tbh: not used
-                    ta_trim_graph()
-                    neg_preds = neg_preds.to('cpu')
-                    neg_masks = neg_masks.to('cpu')
-                    neg_labels = neg_labels.to('cpu')
-                neg_acc = (torch.masked_select(neg_preds, neg_masks) == torch.masked_select(neg_labels, neg_masks)).float().mean()
-            if model.training and neg_acc is not None:
-                if 'neg_acc' not in self._custom_metrics:
-                    self._custom_metrics['neg_acc'] = self._neg_acc
-                self._custom_metrics['neg_acc'] = self._custom_metrics['neg_acc'] + neg_acc / self.args.gradient_accumulation_steps
-        total_loss = pos_loss + neg_loss + margin_loss
-        
-        if return_outputs:
-            outputs = {
-                'pos_outputs': pos_outputs,
-                'neg_outputs': neg_outputs,
-                'pos_loss': pos_loss,
-                'neg_loss': neg_loss,
-                'margin_loss': margin_loss,
-                'total_loss': total_loss
-            }
-            return total_loss, outputs
-        else:
-            return total_loss
+                    preds = preds.to('cpu')
+                    masks = masks.to('cpu')
+                    labels = labels.to('cpu')
+                acc = (torch.masked_select(preds, masks) == torch.masked_select(labels, masks)).float().mean()
+            if model.training and acc is not None:
+                if 'acc' not in self._custom_metrics:
+                    self._custom_metrics['acc'] = self._acc
+                self._custom_metrics['acc'] = self._custom_metrics['acc'] + acc / self.args.gradient_accumulation_steps
+        return (loss, outputs) if return_outputs else loss
 
     def get_train_dataloader(self):
         if self.sequence_parallel_size > 1:
