@@ -8,8 +8,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --model_type internvl2-2b   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
-    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/temp.jsonl \
-    --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/temp.jsonl \
+    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
+    --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 5 \
@@ -19,7 +19,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --lora_dropout_p 0.05 \
     --lora_target_modules DEFAULT \
     --gradient_checkpointing true \
-    --batch_size 1 \
+    --batch_size 4 \
     --weight_decay 0.01 \
     --learning_rate 1e-5 \
     --gradient_accumulation_steps 1 \
@@ -31,7 +31,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_backend=hccl \
     --save_on_each_node false \
     --deepspeed default-zero3 \
-
+    --freeze_parameters 1 \
+    --additional_trainable_parameters language_model mlp1 
 
 NNODES=2 \
 NODE_RANK=1 \
@@ -43,8 +44,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --model_type internvl2-2b   \
     --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
-    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/temp.jsonl \
-    --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/temp.jsonl \
+    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
+    --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
     --num_train_epochs 5 \
@@ -54,7 +55,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --lora_dropout_p 0.05 \
     --lora_target_modules DEFAULT \
     --gradient_checkpointing true \
-    --batch_size 1 \
+    --batch_size 4 \
     --weight_decay 0.01 \
     --learning_rate 1e-5 \
     --gradient_accumulation_steps 1 \
@@ -66,6 +67,5 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_backend=hccl \
     --save_on_each_node false \
     --deepspeed default-zero3 \
-    # --freeze_parameters 1 \
-    # --additional_trainable_parameters language_model mlp1 \
-
+    --freeze_parameters 1 \
+    --additional_trainable_parameters language_model mlp1 
