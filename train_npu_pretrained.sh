@@ -6,9 +6,9 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
     --model_type internvl2-2b   \
-    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output \
+    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output_pretrain \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
-    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
+    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/person_train_mllm_swift_pair_pretrain.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
@@ -32,7 +32,7 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --save_on_each_node false \
     --deepspeed default-zero3 \
     --freeze_parameters 1 \
-    --additional_trainable_parameters mlp1 vision_model
+    --additional_trainable_parameters language_model mlp1
     # --additional_trainable_parameters language_model mlp1 vision_model
 
 NNODES=2 \
@@ -43,9 +43,9 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
     --sft_type full \
     --model_type internvl2-2b   \
-    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output \
+    --output_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/output_pretrain \
     --model_cache_dir /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/InternVL2-2B \
-    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
+    --custom_train_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/data/person_train_mllm_swift_pair_pretrain.jsonl \
     --custom_val_dataset_path /mnt/wfs/mmshanghaiwfssh/project_searcher-others-a100/user_binghaotang/code/swift_pair/person_train_mllm_swift_pairwise.jsonl \
     --save_strategy epoch \
     --save_total_limit -1 \
@@ -69,4 +69,4 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --save_on_each_node false \
     --deepspeed default-zero3 \
     --freeze_parameters 1 \
-    --additional_trainable_parameters mlp1 vision_model
+    --additional_trainable_parameters language_model mlp1
