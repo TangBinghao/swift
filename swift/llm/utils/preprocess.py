@@ -11,6 +11,7 @@ from .media import MediaTag
 from .template import History
 
 PreprocessFunc = Callable[[HfDataset], HfDataset]
+PreprocessFunc_stream = Callable[[Dict[str, Any]], Dict[str, Any]]
 dataset_enable_cache = strtobool(os.environ.get('DATASET_ENABLE_CACHE', 'False'))
 
 

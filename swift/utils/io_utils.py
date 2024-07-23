@@ -1,6 +1,6 @@
 # Copyright (c) Alibaba, Inc. and its affiliates.
-from typing import Any, List
-
+from typing import List, Dict, Any, Optional, Union
+from collections.abc import Iterable
 import json
 
 from .logger import get_logger
@@ -15,7 +15,10 @@ def read_from_jsonl(fpath: str, encoding: str = 'utf-8') -> List[Any]:
         for line in f:
             res.append(json.loads(line))
     return res
-
+# def read_from_jsonl(fpath: str, encoding: str = 'utf-8') -> Iterable[Dict[str, Any]]:
+#     with open(fpath, 'r', encoding=encoding) as f:
+#         for line in f:
+#             yield json.loads(line)
 
 def write_to_jsonl(fpath: str, obj_list: List[Any], encoding: str = 'utf-8') -> None:
     res: List[str] = []

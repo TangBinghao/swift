@@ -6,6 +6,7 @@ from numpy import ndarray
 from numpy.random import RandomState
 from pandas import DataFrame
 from torch import Tensor
+from collections.abc import Iterable
 
 
 def transform_jsonl_to_df(dict_list: List[Dict[str, Any]]) -> DataFrame:

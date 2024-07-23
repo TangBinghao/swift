@@ -1,6 +1,6 @@
 NNODES=2 \
 NODE_RANK=0 \
-MASTER_ADDR=29.35.222.231 \
+MASTER_ADDR=29.35.167.21 \
 NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
@@ -22,6 +22,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --batch_size 4 \
     --weight_decay 0.01 \
     --learning_rate 1e-5 \
+    --lazy_tokenize true \
+    --preprocess_num_proc 32 \
     --gradient_accumulation_steps 1 \
     --eval_steps 100000 \
     --save_steps 100000 \
@@ -34,10 +36,11 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --freeze_parameters 1 \
     --additional_trainable_parameters language_model mlp1
     # --additional_trainable_parameters language_model mlp1 vision_model
+# 47353972
 
 NNODES=2 \
 NODE_RANK=1 \
-MASTER_ADDR=29.35.222.231 \
+MASTER_ADDR=29.35.167.21 \
 NPROC_PER_NODE=8 \
 ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --ddp_find_unused_parameters true \
@@ -59,6 +62,8 @@ ASCEND_RT_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 swift sft  \
     --batch_size 4 \
     --weight_decay 0.01 \
     --learning_rate 1e-5 \
+    --lazy_tokenize true \
+    --preprocess_num_proc 32 \
     --gradient_accumulation_steps 1 \
     --eval_steps 100000 \
     --save_steps 100000 \
