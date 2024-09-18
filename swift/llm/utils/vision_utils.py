@@ -114,9 +114,10 @@ def load_image_tbh(img_path, input_size=448, max_num=1):
                 if filename.endswith(".zip"):
                     if not os.path.exists(filename):
                         raise FileNotFoundError(f"Zip file {filename} does not exist.")
-                    with zipfile.ZipFile(filename, 'r') as zip_file:                        
+                    with zipfile.ZipFile(filename, 'r') as zip_file:
+                        if img_filename not in zip_file.namelist():
+                            raise KeyError(f"There is no item named '{img_filename}' in the archive")
                         img_bytes = zip_file.read(img_filename)
-                        # print(Image.open(BytesIO(img_bytes)).size)
                         image = Image.open(BytesIO(img_bytes))
                 else:
                     image = Image.open(img_path)
@@ -124,10 +125,10 @@ def load_image_tbh(img_path, input_size=448, max_num=1):
             image = img_path
         if image.mode != 'RGB':
             image = image.convert('RGB')
-    except (zipfile.BadZipFile, FileNotFoundError) as e:
-        print(f"Error opening zip file {filename}: {e}")
-        # image = torch.zeros(3, 448, 448)
+    except (zipfile.BadZipFile, FileNotFoundError, KeyError) as e:
+        print(f"Error: {e}")
         image = Image.new('RGB', (448, 448))
+    
     transform = build_transform(input_size=input_size)
     images = dynamic_preprocess(image, image_size=input_size, use_thumbnail=True, max_num=max_num)
     pixel_values = [transform(image) for image in images]
